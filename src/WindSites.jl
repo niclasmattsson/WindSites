@@ -29,6 +29,8 @@ function openmapchrome(lon::Real, lat::Real)
 end
 
 function readusa()
+    # US Wind Turbine Database
+    # https://eerscmap.usgs.gov/uswtdb/
     datadir = joinpath(@__DIR__, "..", "data")
     df = DataFrame!(CSV.File("$datadir/USA_uswtdb_v3_1_20200717.csv"))
     select!(df, [:t_cap, :xlong, :ylat, :p_year, :t_model, :t_hh, :t_rd])
@@ -42,6 +44,8 @@ end
 parse_not_missing(T, x) = ismissing(x) ? missing : parse(T, x)
 
 function readuk()
+    # UK Renewable Energy Planning Database (REPD)
+    # https://www.gov.uk/government/publications/renewable-energy-planning-database-monthly-extract
     datadir = joinpath(@__DIR__, "..", "data")
     cols = [6,9,14,15,16,19,25,26,47]
     df = DataFrame!(CSV.File("$datadir/UK_REPD-June-2020-update.csv"))[!, cols]
@@ -73,6 +77,8 @@ function readuk()
 end
 
 function readdk()
+    # DK Energistyrelsen: Stamdataregister for vindkraftanlæg
+    # https://ens.dk/service/statistik-data-noegletal-og-kort/data-oversigt-over-energisektoren
     datadir = joinpath(@__DIR__, "..", "data")
     cols = [3,13,14,2,7,5,4,10]
     df = DataFrame!(XLSX.readtable("$datadir/DK_anlaegprodtilnettet_0.xlsx", "IkkeAfmeldte-Existing turbines",
