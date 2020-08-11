@@ -41,15 +41,16 @@ end
 
 function readdk()
     datadir = joinpath(@__DIR__, "..", "data")
-    cols = [3,13,14,2,7,5,4]
+    cols = [3,13,14,2,7,5,4,10]
     df = DataFrame!(XLSX.readtable("$datadir/DK_anlaegprodtilnettet_0.xlsx", "IkkeAfmeldte-Existing turbines",
         "A:P", first_row=19, header=false, infer_eltypes=false)...)[!, cols]
-    rename!(df, [:capac, :lon, :lat, :year, :model, :hubheight, :rotordiam])
+    rename!(df, [:capac, :lon, :lat, :year, :model, :hubheight, :rotordiam, :onshore])
     df[!, :capac] = convert.(Int, round.(df[!, :capac]))
     df[!, :model] = string.(df[:, :model])
     df[!, :hubheight] = convert.(Float64, df[!, :hubheight])
     df[!, :rotordiam] = convert.(Float64, df[!, :rotordiam])
     df[!, :year] = Dates.year.(df[!, :year])
+    df[!, :onshore] = uppercase.(df[!, :onshore]) .== "LAND"    # no missings here, no need to check
     delete!(df, ismissing.(df[:, :lon]))
 
     x = df[!, :lon]
@@ -68,6 +69,9 @@ end
 
 df_dk = readdk()
 df_usa = readusa()
+
+CSV.write("turbines_DK.csv", df_dk)
+CSV.write("turbines_USA.csv", df_usa)
 
 # println("\nProjecting coordinates (Mollweide)...")
 # res = 0.01
