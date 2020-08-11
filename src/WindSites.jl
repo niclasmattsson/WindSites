@@ -2,7 +2,7 @@ module WindSites
 
 using Proj4, XLSX, CSV, DataFrames, Dates
 
-export openmap, readusa, readdk, readuk, df_dk, df_usa, df_uk
+export openmap, readusa, readdk, readuk, readse, df_dk, df_usa, df_uk, df_se
 
 function openmap(df::DataFrame, turbinenumber::Int)
     lon, lat = df[turbinenumber, :lon], df[turbinenumber, :lat]
@@ -42,6 +42,7 @@ function readusa()
 end
 
 parse_not_missing(T, x) = ismissing(x) ? missing : parse(T, x)
+convert_not_missing(T, x) = ismissing(x) ? missing : convert(T, x)
 
 function readuk()
     # UK Renewable Energy Planning Database (REPD)
@@ -106,15 +107,50 @@ function readdk()
     return df
 end
 
+function readse()
+    # Länsstyrelsen: Vindbrukskollen
+    # https://vbk.lansstyrelsen.se/
+    datadir = joinpath(@__DIR__, "..", "data")
+    df = DataFrame!(CSV.File("$datadir/SE_Vindbrukskollen_export_allman_Prod.csv"))
+    select!(df, ["Status", "Placering", "E-Koordinat", "N-Koordinat", "Totalhöjd (m)", "Navhöjd (m)",
+        "Rotordiameter (m)", "Maxeffekt (MW)", "Uppfört", "Fabrikat", "Modell"])
+    rename!(df, [:status, :type, :lon, :lat, :height, :hubheight, :rotordiam, :capac, :year, :brand, :model])
+    delete!(df, df[:, :status] .!= "Uppfört")
+    select!(df, Not(:status))
+    df[!, :type] = replace.(df[!, :type], "Land" => "onshore")
+    df[!, :type] = replace.(df[!, :type], "Vatten" => "offshore")
+    delete!(df, ismissing.(df[:, :capac]))
+    delete!(df, df[:, :capac] .== 0)
+    df[!, :capac] = Int.(df[!, :capac] * 1000)
+    df[!, :year] = [d == "Jan 01, 1900" ? missing : Date(d, dateformat"u d, y") for d in df[!, :year]]
+    df[!, :model] = strip.(coalesce.(df[!, :brand], "")) .* " " .* strip.(coalesce.(df[!, :model], ""))
+    df[!, :model] = [m == " " ? missing : m for m in df[!, :model]]
+    select!(df, Not(:brand))
+
+    x = df[!, :lon] # SWEREF99 TM = EPSG:3006
+    y = df[!, :lat] # https://www.lantmateriet.se/sv/Kartor-och-geografisk-information/gps-geodesi-och-swepos/referenssystem/tvadimensionella-system/sweref-99-projektioner/
+    source = Projection("+proj=utm +zone=33 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")
+    dest = Projection("+proj=longlat +datum=WGS84 +no_defs")
+    len = size(df,1)
+    lon, lat = zeros(len), zeros(len)
+    for i = 1:len
+        lon[i], lat[i], _ = Proj4.transform(source, dest, [x[i] y[i] 0])
+    end
+    df[!, :lon] = lon
+    df[!, :lat] = lat
+    return df
+end
 
 
-# df_dk = readdk()
-# df_usa = readusa()
-# df_uk = readuk()
+df_dk = readdk()
+df_usa = readusa()
+df_uk = readuk()
+df_se = readse()
 
-# CSV.write("turbines_DK.csv", df_dk)
-# CSV.write("turbines_USA.csv", df_usa)
-
+CSV.write("turbines_DK.csv", df_dk)
+CSV.write("turbines_USA.csv", df_usa)
+CSV.write("turbines_UK.csv", df_uk)
+CSV.write("turbines_SE.csv", df_se)
 
 # println("\nProjecting coordinates (Mollweide)...")
 # res = 0.01
