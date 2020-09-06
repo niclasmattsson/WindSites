@@ -81,10 +81,10 @@ function readdk()
     # DK Energistyrelsen: Stamdataregister for vindkraftanlæg
     # https://ens.dk/service/statistik-data-noegletal-og-kort/data-oversigt-over-energisektoren
     datadir = joinpath(@__DIR__, "..", "data")
-    cols = [3,13,14,2,7,5,4,10]
+    cols = [3,13,14,2,7,5,4,10,58]
     df = DataFrame!(XLSX.readtable("$datadir/DK_anlaegprodtilnettet_0.xlsx", "IkkeAfmeldte-Existing turbines",
-        "A:P", first_row=19, header=false, infer_eltypes=false)...)[!, cols]
-    rename!(df, [:capac, :lon, :lat, :year, :model, :hubheight, :rotordiam, :onshore])
+        "A:BM", first_row=19, header=false, infer_eltypes=false)...)[!, cols]
+    rename!(df, [:capac, :lon, :lat, :year, :model, :hubheight, :rotordiam, :onshore, :elec2018])
     df[!, :capac] = convert.(Int, round.(df[!, :capac]))
     df[!, :model] = string.(df[:, :model])
     df[!, :hubheight] = convert.(Float64, df[!, :hubheight])
