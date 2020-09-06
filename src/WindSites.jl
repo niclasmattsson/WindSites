@@ -49,7 +49,7 @@ function readuk()
     # https://www.gov.uk/government/publications/renewable-energy-planning-database-monthly-extract
     datadir = joinpath(@__DIR__, "..", "data")
     cols = [6,9,14,15,16,19,25,26,47]
-    df = DataFrame!(CSV.File("$datadir/UK_REPD-June-2020-update.csv"))[!, cols]
+    df = DataFrame!(CSV.File("$datadir/UK_REPD-June-2020-update.csv"))[:, cols]
     rename!(df, [:type, :capac_park, :capac, :nturbines, :height, :status, :lon, :lat, :year])
     delete!(df, .!startswith.(df[!, :type], "Wind"))
     delete!(df, df[:, :status] .!= "Operational")
@@ -111,7 +111,7 @@ function readse()
     # Länsstyrelsen: Vindbrukskollen
     # https://vbk.lansstyrelsen.se/
     datadir = joinpath(@__DIR__, "..", "data")
-    df = DataFrame!(CSV.File("$datadir/SE_Vindbrukskollen_export_allman_Prod.csv"))
+    df = DataFrame(CSV.File("$datadir/SE_Vindbrukskollen_export_allman_Prod.csv"))
     select!(df, ["Status", "Placering", "E-Koordinat", "N-Koordinat", "Totalhöjd (m)", "Navhöjd (m)",
         "Rotordiameter (m)", "Maxeffekt (MW)", "Uppfört", "Fabrikat", "Modell"])
     rename!(df, [:status, :type, :lon, :lat, :height, :hubheight, :rotordiam, :capac, :year, :brand, :model])
