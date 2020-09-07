@@ -147,10 +147,10 @@ function readturbinedata()
     df_uk = readuk()
     df_se = readse()
 
-    CSV.write("turbines_DK.csv", df_dk)
-    CSV.write("turbines_USA.csv", df_usa)
-    CSV.write("turbines_UK.csv", df_uk)
-    CSV.write("turbines_SE.csv", df_se)
+    CSV.write("D:/GISdata/turbines_DK.csv", df_dk)
+    CSV.write("D:/GISdata/turbines_USA.csv", df_usa)
+    CSV.write("D:/GISdata/turbines_UK.csv", df_uk)
+    CSV.write("D:/GISdata/turbines_SE.csv", df_se)
 
     return df_dk, df_usa, df_uk, df_se
 end
