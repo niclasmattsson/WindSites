@@ -1,0 +1,5 @@
+https://ext-geodatakatalog.lansstyrelsen.se/GeodataKatalogen/GetMetaDataById?id=ed5814b2-08bf-493a-a164-7819e1b590d6
+
+https://ext-geodatakatalog.lansstyrelsen.se/GeodataKatalogen/GetAtomView?url=http://ext-dokument.lansstyrelsen.se/gemensamt/geodata/ATOM/ATOM_LST.VKOLLEN_VINDKRAFTVERK.xml
+
+https://ext-dokument.lansstyrelsen.se/gemensamt/geodata/ShapeExport/LST.VKOLLEN_VINDKRAFTVERK.zip

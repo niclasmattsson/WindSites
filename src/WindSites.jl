@@ -1,8 +1,8 @@
 module WindSites
 
-using Proj4, XLSX, CSV, DataFrames, Dates
+using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll
 
-export openmap, readusa, readdk, readuk, readse, readturbinedata
+export openmap, readusa, readdk, readuk, readse, readturbinedata, shapefile2csv
 
 function openmap(df::DataFrame, turbinenumber::Int)
     lon, lat = df[turbinenumber, :lon], df[turbinenumber, :lat]
@@ -110,7 +110,10 @@ end
 
 function readse()
     # Länsstyrelsen: Vindbrukskollen
-    # https://vbk.lansstyrelsen.se/
+    # https://vbk.lansstyrelsen.se/  (click "Excel-export")
+    # shapefile: https://ext-dokument.lansstyrelsen.se/gemensamt/geodata/ShapeExport/LST.VKOLLEN_VINDKRAFTVERK.zip 
+    # shapefile2csv("LST.VKOLLEN_VINDKRAFTVERK/LST_VKOLLEN_VVERK.shp")
+
     datadir = joinpath(@__DIR__, "..", "data")
     df = DataFrame(CSV.File("$datadir/SE_Vindbrukskollen_export_allman_Prod.csv"))
     select!(df, ["Status", "Placering", "E-Koordinat", "N-Koordinat", "Totalhöjd (m)", "Navhöjd (m)",
@@ -147,13 +150,56 @@ function readturbinedata()
     df_usa = readusa()
     df_uk = readuk()
     df_se = readse()
+    df_de = readde()
 
     CSV.write("D:/GISdata/turbines_DK.csv", df_dk)
     CSV.write("D:/GISdata/turbines_USA.csv", df_usa)
     CSV.write("D:/GISdata/turbines_UK.csv", df_uk)
     CSV.write("D:/GISdata/turbines_SE.csv", df_se)
+    CSV.write("D:/GISdata/turbines_DE.csv", df_de)
 
-    return df_dk, df_usa, df_uk, df_se
+    return df_dk, df_usa, df_uk, df_se, df_de
+end
+
+function readde()
+    # Eichhorn et al. (2019), Spatial Distribution of Wind Turbines, Photovoltaic Field Systems, Bioenergy,
+    # and River Hydro Power Plants in Germany
+    # https://www.mdpi.com/2306-5729/4/1/29
+    # https://www.ufz.de/record/dmp/archive/5467/en/
+
+    # shapefile2csv("renewable_energy_plants_germany_until_2015/windpower.shp")
+    datadir = joinpath(@__DIR__, "..", "data")
+    df = DataFrame!(CSV.File("$datadir/DE_windpower.csv"))[!, 2:7]
+    rename!(df, [:year, :capac, :hubheight, :rotordiam, :lon, :lat])
+
+    x = df[!, :lon] # European Terrestrial Reference System 1989: ETRS89/LAEA Europe = EPSG:3035
+    y = df[!, :lat] # https://en.wikipedia.org/wiki/European_Terrestrial_Reference_System_1989
+    source = Projection("+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")
+    dest = Projection("+proj=longlat +datum=WGS84 +no_defs")
+    len = size(df,1)
+    lon, lat = zeros(len), zeros(len)
+    for i = 1:len
+        lon[i], lat[i], _ = Proj4.transform(source, dest, [x[i] y[i] 0])
+    end
+    df[!, :lon] = lon
+    df[!, :lat] = lat
+    return df
+end
+
+function shapefile2csv(filename)
+    datadir = joinpath(@__DIR__, "..", "data")
+    shapefile = "$datadir/$filename"
+    layername = splitext(basename(filename))[1]
+    # sql = "select FID+1 as FID from \"$layername\""
+
+    ogrinfo_path() do ogrinfo
+        @time run(`$ogrinfo -al -so $shapefile`)
+    end
+
+    ogr2ogr_path() do ogr2ogr
+        # @time run(`$ogr2ogr -f CSV $outfile -dialect SQlite -sql $sql $shapefile`)
+        @time run(`$ogr2ogr -f CSV $datadir/$layername.csv $shapefile`)
+    end
 end
 
 # println("\nProjecting coordinates (Mollweide)...")
