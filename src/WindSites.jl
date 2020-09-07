@@ -91,6 +91,7 @@ function readdk()
     df[!, :rotordiam] = convert.(Float64, df[!, :rotordiam])
     df[!, :year] = Dates.year.(df[!, :year])
     df[!, :onshore] = uppercase.(df[!, :onshore]) .== "LAND"    # no missings here, no need to check
+    df[!, :elec2018] = df[!, :elec2018] / 1000
     delete!(df, ismissing.(df[:, :lon]))
 
     x = df[!, :lon] # European Terrestrial Reference System 1989: ETRS89/UTM zone 32N = EPSG:25832
