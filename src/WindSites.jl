@@ -1,6 +1,6 @@
 module WindSites
 
-using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll
+using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML
 
 export openmap, readusa, readdk, readuk, readse, readturbinedata, shapefile2csv
 
@@ -161,11 +161,11 @@ function readturbinedata()
     df_se = readse()
     df_de = readde()
 
-    CSV.write("D:/GISdata/turbines_DK.csv", df_dk)
-    CSV.write("D:/GISdata/turbines_USA.csv", df_usa)
-    CSV.write("D:/GISdata/turbines_UK.csv", df_uk)
-    CSV.write("D:/GISdata/turbines_SE.csv", df_se)
-    CSV.write("D:/GISdata/turbines_DE.csv", df_de)
+    CSV.write(in_datafolder("turbines_DK.csv"), df_dk)
+    CSV.write(in_datafolder("turbines_USA.csv"), df_usa)
+    CSV.write(in_datafolder("turbines_UK.csv"), df_uk)
+    CSV.write(in_datafolder("turbines_SE.csv"), df_se)
+    CSV.write(in_datafolder("turbines_DE.csv"), df_de)
 
     return df_dk, df_usa, df_uk, df_se, df_de
 end
@@ -220,5 +220,17 @@ end
 # dest = Projection("+proj=moll +lon_0=$(mean(lons))")
 # xs, ys = xygrid(lons, lats)
 # Proj4.transform!(source, dest, vec(xs), vec(ys))
+
+in_datafolder(names...) = joinpath(getconfig("datafolder"), names...)
+
+getconfig(key) = getconfig()[key]
+
+function getconfig()
+    configfile = joinpath(homedir(), ".GlobalEnergyGIS_config")
+    if !isfile(configfile)
+        error("Configuration file missing, please run saveconfig(datafolder, uid, api_key) first. See GlobalEnergyGIS README.")
+    end
+    return TOML.parsefile(configfile)
+end
 
 end # module
