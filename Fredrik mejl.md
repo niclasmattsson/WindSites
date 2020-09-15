@@ -1,3 +1,25 @@
+# To do
+
+1. Why did we mask out areas where turbines exist IRL?
+    * split onshore_OK into separate mask categories
+    * add all into regional dataframe
+    * print summary statistics per country (see dataframe for regional stats)
+
+2. Calculate exploited area
+    * calculate total area of each region, and total masked and unmasked areas
+    * separate by on and offshore as well
+    * calculate power density of (actual) turbines in total and (model) unmasked areas
+        for each region (density_total, density_unmasked)
+    * calculate exploited area for each region in % using our assumed turbine density
+    * redo calculation for entire country and print summary statistics 
+
+3. Time variation of exploited area
+    * repeat step 2c, 2d and 2e for each year
+    * save result in a matrix (region_name x exploited_area_in_year) and country
+        result in a vector, then sort by current exploited and plot top 10 curves
+
+# Nytt mejl
+
 Några tillägg och kommentarer.
  
 1. Kolla för alla länder de vindkraftverk som ligger på områden som är förbjudna enligt vår mask. Analysera vilka kriterier som gjorde dem förbjudna. Fokus på de stora dragen, och relativt nya verk. Syfte, testa var masken är för restriktiv.
@@ -7,17 +29,19 @@ Några tillägg och kommentarer.
         - Ja, jag tänkte också på någon sådan variant. Vi ska ha det i minnet och fundera på hur det görs på ett bra sätt
  
 2. Ta fram faktisk täthet av vind MW/m2 på tillåten mark, i kommuner. Fokusera på vindtäta områden, Danmark, nordtyskland, kanske delar av USA. Syfte analysera maximal täthet som hittills uppnåtts.
-    * Här kan vi uttrycka tätheten dels i MW/km över hela kommunen och dels som procent exploaterad area (om vi antar att vår turbintäthet för en park är någorlunda korrekt).
-        - Över hela kommunen tänker jag är mindre intressant. Men såväl % som MW/km2 är ju relevanta mått för oss
+    * Här kan vi uttrycka tätheten dels i MW/km2 över hela kommunen och dels som procent exploaterad area (om vi antar att vår turbintäthet för en park är någorlunda korrekt).
+        - Över hela kommunen tänker jag är mindre intressant. Men såväl % som MW/km2 är ju relevanta mått för oss [Niclas menade MW/km2 över tillåten yta i kommunen]
     * En fördel med att analysera en hel kommun: kommunen motsvarar ofta ett helt minisamhälle med minst en tätort och flera mindre samhällen med landsbygd däremellan. Hade vi valt lite slumpmässiga 10x10 km pixlar så kommer vi ibland att pricka en hel vindpark, och då ser det ut som 100% exploatering ibland är möjligt.
         - Sant
 
 3. Plocka ut 10 kommuner med högst täthet i varje land. Analysera hur tätheten utvecklats över tid. Syfte: Verkar utbyggnaden över tid mattas vi någon särskild nivå?
-    * Kanske hjälper att aggregera dessa 10 kommuner och normalisera till exploateringsgrad. 
+    * Kanske hjälper att aggregera dessa 10 kommuner och normalisera till exploateringsgrad.
         - Det förstod jag inte
+        [Dålig idé. Bättre bara aggregera och göra om beräkningen för hela regionklumpen,
+        alltså aggregera kapacitet och area var för sig och sedan ta kvoten.]
 
 
--------------------
+# Gammalt mejl
 
 Jag tror vi ska utgå ifrån iden om avvikelser från slumpmässig placering. Så om vi tar ett land, och först plockar bort allt land som har sämre vindförhållanden än x (Detta kan ju tas från data också, vilket vindkraftverk är byggt på stället med sämst vindläge?
 
