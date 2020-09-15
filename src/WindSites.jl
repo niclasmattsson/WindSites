@@ -5,8 +5,17 @@ using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll
 export openmap, readusa, readdk, readuk, readse, readturbinedata, shapefile2csv
 
 function openmap(df::DataFrame, turbinenumber::Int)
+    openmap(df, turbinenumber, :bing)
+    openmap(df, turbinenumber, :google)
+end
+    
+function openmap(df::DataFrame, turbinenumber::Int, source::Symbol)
     lon, lat = df[turbinenumber, :lon], df[turbinenumber, :lat]
-    url = "http://maps.google.com/maps?t=k\"&\"q=loc:$lat+$lon"
+    if source == :google
+        url = "http://maps.google.com/maps?t=k\"&\"q=loc:$lat+$lon"
+    else
+        url = "https://bing.com/maps/default.aspx?cp=$lat~$lon\"&\"lvl=18\"&\"style=a\"&\"sp=point.$(lat)_$(lon)_"
+    end
     c = Cmd(`cmd /c start \"\" $url`, windows_verbatim=true)
     run(c)
     return df[turbinenumber, :]
