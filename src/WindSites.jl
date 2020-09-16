@@ -1,8 +1,8 @@
 module WindSites
 
-using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML
+using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML, Plots
 
-export openmap, readusa, readdk, readuk, readse, readturbinedata, shapefile2csv
+export openmap, readusa, readdk, readuk, readse, readturbinedata, shapefile2csv, scatterplots
 
 function openmap(df::DataFrame, turbinenumber::Int)
     openmap(df, turbinenumber, :bing)
@@ -232,5 +232,44 @@ function getconfig()
     end
     return TOML.parsefile(configfile)
 end
+
+function scatterplots(gisregion, type=[:total])
+    dfg = DataFrame!(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
+    dfm = DataFrame!(CSV.File(in_datafolder("output", "windresults_$gisregion.csv")))
+    dfm[!,:mcap] = vec(sum(Array(dfm[:, [:cap1, :cap2, :cap3, :cap4, :cap5]]), dims=2))
+    dfm[!,:moffcap] = vec(sum(Array(dfm[:, [:offcap1, :offcap2, :offcap3, :offcap4, :offcap5]]), dims=2))
+    dfm[!,:melec] = vec(sum(Array(dfm[:, [:elec1, :elec2, :elec3, :elec4, :elec5]]), dims=2))
+    dfm[!,:moffelec] = vec(sum(Array(dfm[:, [:offelec1, :offelec2, :offelec3, :offelec4, :offelec5]]), dims=2))
+    dfm[:mclass] = (1*dfm[:cap1] + 2*dfm[:cap2] + 3*dfm[:cap3] + 4*dfm[:cap4] + 5*dfm[:cap5]) ./ dfm[:mcap]
+    dfm[:mclass] = replace(round.(dfm[:mclass], digits=2), NaN => missing)
+    dfm[:moffclass] = (1*dfm[:offcap1] + 2*dfm[:offcap2] + 3*dfm[:offcap3] + 4*dfm[:offcap4] + 5*dfm[:offcap5]) ./ dfm[:moffcap]
+    dfm[:moffclass] = replace(round.(dfm[:moffclass], digits=2), NaN => missing)
+
+    df = innerjoin(dfg, dfm, on=:region)
+    select!(df, [:region, :capac, :offcapac, :elec2018, :mcap, :moffcap, :melec, :moffelec, :mclass, :moffclass])
+    plotly()
+    println(type)
+    if :onshore in type
+        s = scatter(df[:capac], df[:mcap], markersize=df[:mclass]*2, title="Onshore capacity",
+            hover=df[:region].*" class ".*string.(df[:mclass]),
+            xlabel="GW (real)", ylabel="GW (model)", size=(800,650))
+        display(s)
+    elseif :offshore in type
+        s = scatter(df[:offcapac], df[:moffcap], markersize=df[:moffclass]*2, title="Offshore capacity",
+            hover=df[:region].*" class ".*string.(df[:moffclass]),
+            xlabel="GW (real)", ylabel="GW (model)", size=(800,650))
+        display(s)
+    elseif :total in type
+        s = scatter(df[:capac]+df[:offcapac], df[:mcap]+df[:moffcap], markersize=df[:mclass]*2, title="Total capacity",
+            hover=df[:region].*" class ".*string.(df[:mclass]),
+            xlabel="GW (real)", ylabel="GW (model)", size=(800,650))
+        display(s)
+    elseif :elec in type
+        s = scatter(df[:elec2018], df[:melec], markersize=df[:mclass], xlabel="GWh (real)", ylabel="GWh (model)")
+        display(s)
+    end
+    df
+ end
+
 
 end # module
