@@ -1,3 +1,28 @@
+# Nytt mejl
+
+Syfte: Undersöka hur många % av tillgänglig mark som amvänds för vind deployment i olika kommuner hittills.
+ 
+Ta område med vindklass 3-5. Ändra befolkningsmasken till att man får bygga vind där det bor 75 pers/km2 eller mer.
+ 
+Ta fram fördelningsfunktion för andel som har en viss deployment densitet. Ta bort kommuner som inte har någon vindkraft (annars tror jag det stör hur datan ser ut)
+    * NM: kanske scatter(installed, turbine density)
+ 
+Gör en fördelning mer land.
+
+## Mitt svar
+
+Fine. Jag vill också börja få lite grepp om de andra parametrarna, turbintäthet i en park till att börja med. Tänkte så här:
+ 
+* Kolla om rotordiameter finns angiven för varje turbin, annars uppskatta med hjälp av turbineffekten. 
+* Ta reda på närmaste turbingranne för varje turbin, uttryck avståndet i rotordiametrar och rita histogram. Hur bra stämmer tumregeln minst 5-7 rotordiametrar isär?
+* Klustra turbinerna i parker med turbiner som har alla har max X meter till närmaste granne i klustret (testa olika X från 10-30 rotordiametrar).
+* Välj ett värde på karakteristiskt turbinavstånd A inom varje park - antingen min, max eller medelavstånd inom parken. Alla tre kan kanske vara rimliga val.
+* Beräkna parkyta som ytan av alla cirklar med radie A/2 omkring varje turbin minus allt överlapp. Beräkna sedan turbintäthet i parken.
+* Rita histogram över turbintäthet för alla parker, jämför med vårt värde på 5 MW/km2.
+ 
+När vi har bättre koll på turbintäthet i parker blir vår nya "exploateringsgrad" mer konkret.
+
+
 # To do
 
 1. Why did we mask out areas where turbines exist IRL?
