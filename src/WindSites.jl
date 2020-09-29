@@ -3,7 +3,7 @@ module WindSites
 using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML, Plots, Loess, SmoothingSplines
 
 export openmap, readusa, readdk, readuk, readse, readde, readturbinedata, shapefile2csv,
-    scatterplots, plotdist, fill_missing_rotordiams!
+    scatterplots_model, plotdist, fill_missing_rotordiams!
 
 function openmap(df::DataFrame, turbinenumber::Int)
     openmap(df, turbinenumber, :bing)
@@ -168,14 +168,14 @@ function readse()
     return df
 end
 
-function readturbinedata(; showplots=false)
+function readturbinedata(; rotordiamplots=false)
     df_dk = readdk()
     df_usa = readusa()
     df_uk = readuk()
     df_se = readse()
     df_de = readde()
 
-    fill_missing_rotordiams!(df_dk, df_usa, df_uk, df_se, df_de; showplots=showplots)
+    fill_missing_rotordiams!(df_dk, df_usa, df_uk, df_se, df_de; rotordiamplots=rotordiamplots)
 
     CSV.write(in_datafolder("turbines_DK.csv"), df_dk)
     CSV.write(in_datafolder("turbines_USA.csv"), df_usa)
@@ -251,28 +251,28 @@ end
 
 # estimate missing rotor diameters from turbine capacity using smoothing splines
 # fit separate splines to turbines below and above 1 MW
-function fill_missing_rotordiams!(df_dk, df_usa, df_uk, df_se, df_de; showplots=false)
+function fill_missing_rotordiams!(df_dk, df_usa, df_uk, df_se, df_de; rotordiamplots=false)
     df = df_de[:, [:rotordiam, :capac]]
     badrows = (df[:capac] .< 80) .& (df[:rotordiam] .> 20)
     df = df[.!badrows, :]
     for dd in [df_se, df_dk, df_usa]
         df = vcat(df, dd[:, [:rotordiam, :capac]])
     end
-    showplots && display(histogram(df[ismissing.(df[:rotordiam]), :capac]))
+    rotordiamplots && plotly()
+    rotordiamplots && display(histogram(df[ismissing.(df[:rotordiam]), :capac]))
 
     dfd = dropmissing(df, [:rotordiam, :capac])
     dfd = dfd[dfd[:rotordiam] .> 5, :]
     x = float.(dfd[:, :capac])
     y = float.(dfd[:, :rotordiam])
-    showplots && plotly()
-    showplots && scatter(x, y .+ 1*randn(size(dfd,1)), markersize=1, alpha=0.1)
+    rotordiamplots && scatter(x, y .+ 1*randn(size(dfd,1)), markersize=1, alpha=0.1)
     ss1 = fit(SmoothingSpline, x, y, 0.0001*maximum(x)^3)
     ss2 = fit(SmoothingSpline, x, y, 0.1*maximum(x)^3)
     # ss = loess(x, y, span=0.75, degree=3)
     xx = range(minimum(x), maximum(x), length=1000)
     yy1 = SmoothingSplines.predict(ss1, xx)
     yy2 = SmoothingSplines.predict(ss2, xx)
-    showplots && display(plot!(xx, [yy1, yy2]))
+    rotordiamplots && display(plot!(xx, [yy1, yy2]))
     
     df_uk[:, :rotordiam] = zeros(Int, size(df_uk,1))
     for dd in [df_se, df_dk, df_de, df_uk, df_usa]
