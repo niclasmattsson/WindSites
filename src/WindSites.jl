@@ -1,8 +1,9 @@
 module WindSites
 
-using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML, Plots
+using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML, Plots, Loess, SmoothingSplines
 
-export openmap, readusa, readdk, readuk, readse, readturbinedata, shapefile2csv, scatterplots
+export openmap, readusa, readdk, readuk, readse, readturbinedata, shapefile2csv,
+    scatterplots, plotdist, fill_missing_rotordiams!
 
 function openmap(df::DataFrame, turbinenumber::Int)
     openmap(df, turbinenumber, :bing)
@@ -154,12 +155,14 @@ function readse()
     return df
 end
 
-function readturbinedata()
+function readturbinedata(; showplots=false)
     df_dk = readdk()
     df_usa = readusa()
     df_uk = readuk()
     df_se = readse()
     df_de = readde()
+
+    fill_missing_rotordiams!(df_dk, df_usa, df_uk, df_se, df_de; showplots=showplots)
 
     CSV.write(in_datafolder("turbines_DK.csv"), df_dk)
     CSV.write(in_datafolder("turbines_USA.csv"), df_usa)
@@ -233,7 +236,47 @@ function getconfig()
     return TOML.parsefile(configfile)
 end
 
-function scatterplots(gisregion, type=[:total])
+# estimate missing rotor diameters from turbine capacity using smoothing splines
+# fit separate splines to turbines below and above 1 MW
+function fill_missing_rotordiams!(df_dk, df_usa, df_uk, df_se, df_de; showplots=false)
+    df = df_de[:, [:rotordiam, :capac]]
+    badrows = (df[:capac] .< 80) .& (df[:rotordiam] .> 20)
+    df = df[.!badrows, :]
+    for dd in [df_se, df_dk, df_usa]
+        df = vcat(df, dd[:, [:rotordiam, :capac]])
+    end
+    showplots && display(histogram(df[ismissing.(df[:rotordiam]), :capac]))
+
+    dfd = dropmissing(df, [:rotordiam, :capac])
+    dfd = dfd[dfd[:rotordiam] .> 5, :]
+    x = float.(dfd[:, :capac])
+    y = float.(dfd[:, :rotordiam])
+    showplots && plotly()
+    showplots && scatter(x, y .+ 1*randn(size(dfd,1)), markersize=1, alpha=0.1)
+    ss1 = fit(SmoothingSpline, x, y, 0.0001*maximum(x)^3)
+    ss2 = fit(SmoothingSpline, x, y, 0.1*maximum(x)^3)
+    # ss = loess(x, y, span=0.75, degree=3)
+    xx = range(minimum(x), maximum(x), length=1000)
+    yy1 = SmoothingSplines.predict(ss1, xx)
+    yy2 = SmoothingSplines.predict(ss2, xx)
+    showplots && display(plot!(xx, [yy1, yy2]))
+    
+    df_uk[:, :rotordiam] = zeros(Int, size(df_uk,1))
+    for dd in [df_se, df_dk, df_de, df_uk, df_usa]
+        rows = (dd[:capac] .<= 1000)
+        is_uk = (size(dd,1) == size(df_uk,1)) 
+        rows = is_uk ? rows : rows .& ismissing.(dd[:rotordiam])
+        dd[rows, :rotordiam] =
+            round.(Int, SmoothingSplines.predict(ss1, float.(dd[rows, :capac])))
+        rows = (dd[:capac] .> 1000)
+        rows = is_uk ? rows : rows .& ismissing.(dd[:rotordiam])
+        dd[rows, :rotordiam] =
+            round.(Int, SmoothingSplines.predict(ss2, float.(dd[rows, :capac])))
+        dd[!, :rotordiam] = round.(Int, dd[:, :rotordiam])
+    end
+end
+
+function scatterplots_model(gisregion, type=[:total])
     dfg = DataFrame!(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
     dfm = DataFrame!(CSV.File(in_datafolder("output", "windresults_$gisregion.csv")))
     dfm[!,:mcap] = vec(sum(Array(dfm[:, [:cap1, :cap2, :cap3, :cap4, :cap5]]), dims=2))
