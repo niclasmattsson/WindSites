@@ -7,7 +7,8 @@ Ta område med vindklass 3-5. Ändra befolkningsmasken till att man får bygga v
 Ta fram fördelningsfunktion för andel som har en viss deployment densitet. Ta bort kommuner som inte har någon vindkraft (annars tror jag det stör hur datan ser ut)
     * NM: kanske scatter(installed, turbine density)
  
-Gör en fördelning mer land.
+Gör en fördelning mer land: Alltså fördelning av deployment density per kommun för Danmark, en för Sverige, en för tyskland, och en för USA. För att se hur mycket de skiljer sig åt per land. Du sade idag att du bara tittat på tre delstater, men vi sade väl att vi skulle kolla på hela USA.
+    * NM: Nu förstår jag. Första delen (fördelning per land) har jag gjort. Ska försöka beta av fler delstater i USA också. Kort möte fredag lunch är OK.
 
 ## Mitt svar
 
@@ -21,7 +22,6 @@ Fine. Jag vill också börja få lite grepp om de andra parametrarna, turbintät
 * Rita histogram över turbintäthet för alla parker, jämför med vårt värde på 5 MW/km2.
  
 När vi har bättre koll på turbintäthet i parker blir vår nya "exploateringsgrad" mer konkret.
-
 
 # To do
 

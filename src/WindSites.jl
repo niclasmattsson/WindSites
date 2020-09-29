@@ -271,5 +271,24 @@ function scatterplots(gisregion, type=[:total])
     df
  end
 
+function plotdist(gisregion; mincapac=0, scatterplot=false, alpha=1, markersize=2)
+    df = DataFrame!(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
+    df = df[df[:capac].>=mincapac, :]
+    plotly()
+    p = histogram(df[:exploit_tot], bins=100, xlabel="% exploited",
+        legend = :outertopright, size=(800,550))
+    display(p)
+    if scatterplot
+        p = scatter(df[:exploit_tot], df[:capac], xlabel="% exploited", ylabel="MW",
+            size=(800,550), legend=false, colorbar=true,
+            markersize=df[:class].^(1+markersize/10),
+            marker_z=df[:masked], color=:watermelon, alpha=alpha,
+            hover=df[:region].*"<br>".*string.(df[:capac]).*" MW".*
+            "<br>exploited = ".*string.(df[:exploit_tot]).*"%".*
+            "<br>class = ".*string.(df[:class]).*"<br>masked = ".*string.(df[:masked]))
+        display(p)
+    end       
+    return df
+end
 
 end # module
