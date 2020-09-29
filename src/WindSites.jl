@@ -2,7 +2,7 @@ module WindSites
 
 using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML, Plots, Loess, SmoothingSplines
 
-export openmap, readusa, readdk, readuk, readse, readturbinedata, shapefile2csv,
+export openmap, readusa, readdk, readuk, readse, readde, readturbinedata, shapefile2csv,
     scatterplots, plotdist, fill_missing_rotordiams!
 
 function openmap(df::DataFrame, turbinenumber::Int)
@@ -118,12 +118,20 @@ function readdk()
     return df
 end
 
+function xlsx2csv()
+    datadir = joinpath(@__DIR__, "..", "data")
+    df = DataFrame!(XLSX.readtable("$datadir/SE_Vindbrukskollen_export_allman_Prod.xlsx", "Vindkraftverk",
+        "A:AN", first_row=1, header=true, infer_eltypes=true)...)
+    CSV.write("$datadir/SE_Vindbrukskollen_export_allman_Prod.csv", df)
+    return df
+end
+
 function readse()
     # Länsstyrelsen: Vindbrukskollen
     # https://vbk.lansstyrelsen.se/  (click "Excel-export")
     # shapefile: https://ext-dokument.lansstyrelsen.se/gemensamt/geodata/ShapeExport/LST.VKOLLEN_VINDKRAFTVERK.zip 
     # shapefile2csv("LST.VKOLLEN_VINDKRAFTVERK/LST_VKOLLEN_VVERK.shp")
-
+    # but actually used xlsx2csv() above to convert the Excel file 
     datadir = joinpath(@__DIR__, "..", "data")
     df = DataFrame(CSV.File("$datadir/SE_Vindbrukskollen_export_allman_Prod.csv"))
     select!(df, ["Status", "Placering", "E-Koordinat", "N-Koordinat", "Totalhöjd (m)", "Navhöjd (m)",
@@ -131,12 +139,17 @@ function readse()
     rename!(df, [:status, :type, :lon, :lat, :height, :hubheight, :rotordiam, :capac, :year, :brand, :model])
     delete!(df, df[:, :status] .!= "Uppfört")
     select!(df, Not(:status))
+    twoturbines = findall(ismissing.(df[:type]))
+    if twoturbines == [1196, 1197]     # hard code a fix for two turbines
+        df[twoturbines, :type] .= "Land"
+    end
     df[!, :onshore] = startswith.(df[!, :type], "Land")     # all turbines are marked "Land" or "Vatten"
     select!(df, Not(:type))
     delete!(df, ismissing.(df[:, :capac]))
     delete!(df, df[:, :capac] .== 0)
     df[!, :capac] = Int.(df[!, :capac] * 1000)
-    df[!, :year] = [d == "Jan 01, 1900" ? missing : Date(d, dateformat"u d, y") for d in df[!, :year]]
+    # df[!, :year] = [d == "Jan 01, 1900" ? missing : Date(d, dateformat"u d, y") for d in df[!, :year]]
+    df[df[!, :year] .< Date(1980), :year] .= missing
     df[!, :model] = strip.(coalesce.(df[!, :brand], "")) .* " " .* strip.(coalesce.(df[!, :model], ""))
     df[!, :model] = [m == " " ? missing : m for m in df[!, :model]]
     select!(df, Not(:brand))
