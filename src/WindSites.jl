@@ -346,20 +346,33 @@ function scatterplots_model(gisregion, type=[:total]; showlines=false)
     df
  end
 
-function plotdist(gisregion; mincapac=0, scatterplot=false, alpha=1, markersize=2)
+function plotdist(gisregion::String; args...)
     df = DataFrame!(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
+    plotdist(df; args...)
+end
+
+function plotdist(gisregions::Vector{String}; args...)
+    dfs = [DataFrame!(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
+            for gisregion in gisregions]
+    df = vcat(dfs...)
+    plotdist(df; args...)
+end
+
+function plotdist(df::DataFrame; mincapac=0, area_mult=1.0, scatterplot=false,
+                    variable=:exploit_tot, alpha=1, markersize=2)
     df = df[df[:capac].>=mincapac, :]
     plotly()
-    p = histogram(df[:exploit_tot], bins=100, xlabel="% exploited",
-        legend = :outertopright, size=(800,550))
+    p = histogram(df[variable]*area_mult, bins=100, xlabel="% exploited",
+        legend = false, size=(800,550), title=variable)
+    plot!(100*[area_mult, area_mult], collect(ylims(p)), line=(3, :dash))
     display(p)
     if scatterplot
-        p = scatter(df[:exploit_tot], df[:capac], xlabel="% exploited", ylabel="MW",
+        p = scatter(df[variable]*area_mult, df[:capac], xlabel="% exploited", ylabel="MW",
             size=(800,550), legend=false, colorbar=true,
             markersize=df[:class].^(1+markersize/10),
             marker_z=df[:masked], color=:watermelon, alpha=alpha,
             hover=df[:region].*"<br>".*string.(df[:capac]).*" MW".*
-            "<br>exploited = ".*string.(df[:exploit_tot]).*"%".*
+            "<br>exploited = ".*string.(df[variable]).*"%".*
             "<br>class = ".*string.(df[:class]).*"<br>masked = ".*string.(df[:masked]))
         display(p)
     end       
