@@ -140,7 +140,7 @@ function readse()
     rename!(df, [:status, :type, :lon, :lat, :height, :hubheight, :rotordiam, :capac, :year, :brand, :model])
     delete!(df, df[:, :status] .!= "Uppfört")
     select!(df, Not(:status))
-    twoturbines = findall(ismissing.(df[:type]))
+    twoturbines = findall(ismissing.(df[!, :type]))
     if twoturbines == [1196, 1197]     # hard code a fix for two turbines
         df[twoturbines, :type] .= "Land"
     end
@@ -254,16 +254,16 @@ end
 # fit separate splines to turbines below and above 1 MW
 function fill_missing_rotordiams!(df_dk, df_usa, df_uk, df_se, df_de; rotordiamplots=false)
     df = df_de[:, [:rotordiam, :capac]]
-    badrows = (df[:capac] .< 80) .& (df[:rotordiam] .> 20)
+    badrows = (df[!, :capac] .< 80) .& (df[!, :rotordiam] .> 20)
     df = df[.!badrows, :]
     for dd in [df_se, df_dk, df_usa]
         df = vcat(df, dd[:, [:rotordiam, :capac]])
     end
     rotordiamplots && plotly()
-    rotordiamplots && display(histogram(df[ismissing.(df[:rotordiam]), :capac]))
+    rotordiamplots && display(histogram(df[ismissing.(df[!, :rotordiam]), :capac]))
 
     dfd = dropmissing(df, [:rotordiam, :capac])
-    dfd = dfd[dfd[:rotordiam] .> 5, :]
+    dfd = dfd[dfd[!, :rotordiam] .> 5, :]
     x = float.(dfd[:, :capac])
     y = float.(dfd[:, :rotordiam])
     rotordiamplots && scatter(x, y .+ 1*randn(size(dfd,1)), markersize=1, alpha=0.1)
@@ -277,13 +277,13 @@ function fill_missing_rotordiams!(df_dk, df_usa, df_uk, df_se, df_de; rotordiamp
     
     df_uk[:, :rotordiam] = zeros(Int, size(df_uk,1))
     for dd in [df_se, df_dk, df_de, df_uk, df_usa]
-        rows = (dd[:capac] .<= 1000)
+        rows = (dd[!, :capac] .<= 1000)
         is_uk = (size(dd,1) == size(df_uk,1)) 
-        rows = is_uk ? rows : rows .& ismissing.(dd[:rotordiam])
+        rows = is_uk ? rows : rows .& ismissing.(dd[!, :rotordiam])
         dd[rows, :rotordiam] =
             round.(Int, SmoothingSplines.predict(ss1, float.(dd[rows, :capac])))
-        rows = (dd[:capac] .> 1000)
-        rows = is_uk ? rows : rows .& ismissing.(dd[:rotordiam])
+        rows = (dd[!, :capac] .> 1000)
+        rows = is_uk ? rows : rows .& ismissing.(dd[!, :rotordiam])
         dd[rows, :rotordiam] =
             round.(Int, SmoothingSplines.predict(ss2, float.(dd[rows, :capac])))
         dd[!, :rotordiam] = round.(Int, dd[:, :rotordiam])
