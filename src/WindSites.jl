@@ -358,22 +358,42 @@ function plotdist(gisregions::Vector{String}; args...)
     plotdist(df; args...)
 end
 
-function plotdist(df::DataFrame; mincapac=0, area_mult=1.0, scatterplot=false,
-                    variable=:exploit_tot, alpha=1, markersize=2)
-    df = df[df[:capac].>=mincapac, :]
+function plotdist(df::DataFrame; mincapac=0, area_mult=1.0, scatterplot=0, bins=100,
+                    variable=:exploit_tot, alpha=1, markersize=2, comparisonline=true)
+    df = df[df[!,:capac].>=mincapac, :]
     plotly()
-    p = histogram(df[variable]*area_mult, bins=100, xlabel="% exploited",
-        legend = false, size=(800,550), title=variable)
-    plot!(100*[area_mult, area_mult], collect(ylims(p)), line=(3, :dash))
-    display(p)
-    if scatterplot
-        p = scatter(df[variable]*area_mult, df[:capac], xlabel="% exploited", ylabel="MW",
+    if scatterplot == 0
+        p = histogram(df[!,variable]*area_mult, bins=bins,
+            xlabel="Exploited area per municipality/county [%]",
+            ylabel="Number of municipalities/counties",
+            tickfont=14, guidefont=14,
+            legend = false, size=(800,550))  # title=variable
+            # tickfont=10, legendfont=14, guidefont=14,
+        comparisonline && plot!(100*area_mult*[1, 1], collect(ylims(p)), line=(3, :dash))
+        display(p)
+    elseif scatterplot == 1
+        p = scatter(df[!,variable]*area_mult, df[!,:capac], 
+            xlabel="Exploited area per municipality/county [%]",
+            ylabel="MW",
             size=(800,550), legend=false, colorbar=true,
-            markersize=df[:class].^(1+markersize/10),
-            marker_z=df[:masked], color=:watermelon, alpha=alpha,
-            hover=df[:region].*"<br>".*string.(df[:capac]).*" MW".*
-            "<br>exploited = ".*string.(df[variable]).*"%".*
-            "<br>class = ".*string.(df[:class]).*"<br>masked = ".*string.(df[:masked]))
+            markersize=df[!,:class].^(1+markersize/10),
+            marker_z=df[!,:masked], color=:watermelon, alpha=alpha,
+            hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
+            "<br>exploited = ".*string.(round.(df[!,variable]*area_mult,digits=1)).*"%".*
+            "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
+        display(p)
+    elseif scatterplot == 2
+        p = scatter(df[!,variable]*area_mult, df[!,:class], 
+            xlabel="Exploited area per municipality/county [%]",
+            ylabel="Mean wind class",
+            size=(800,550), legend=false, colorbar=true,
+            markersize=max.(1, df[!,:capac].^(markersize/2)),
+            markerstrokewidth=0,
+            marker_z=df[!,:masked], color=:watermelon, alpha=alpha,
+            hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
+            "<br>test = ".*string.(max.(1, df[!,:capac].^(markersize/2))).*
+            "<br>exploited = ".*string.(round.(df[!,variable]*area_mult,digits=1)).*"%".*
+            "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
         display(p)
     end       
     return df
