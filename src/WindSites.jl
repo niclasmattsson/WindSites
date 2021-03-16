@@ -1,7 +1,7 @@
 module WindSites
 
 using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML, Plots, MAT,
-        Loess, SmoothingSplines
+        Loess, SmoothingSplines, Plots.PlotMeasures
 
 export openmap, readusa, readdk, readuk, readse, readde, readturbinedata, shapefile2csv,
     scatterplots_model, plotdist, fill_missing_rotordiams!
@@ -359,43 +359,62 @@ function plotdist(gisregions::Vector{String}; args...)
 end
 
 function plotdist(df::DataFrame; mincapac=0, area_mult=1.0, scatterplot=0, bins=100,
-                    variable=:exploit_tot, alpha=1, markersize=2, comparisonline=true)
+                    variable=:exploit_tot, alpha=1, markersize=2, comparisonline=true,
+                    scale=1)
     df = df[df[!,:capac].>=mincapac, :]
     plotly()
+    blank = "<span style='color:white; font-size: 1px;'>q</span>"
     if scatterplot == 0
-        p = histogram(df[!,variable]*area_mult, bins=bins,
+        p = histogram(df[!,variable], bins=range(0, 25.5, length=bins),
             xlabel="Exploited area per municipality/county [%]",
-            ylabel="Number of municipalities/counties",
-            tickfont=14, guidefont=14,
-            legend = false, size=(800,550))  # title=variable
-            # tickfont=10, legendfont=14, guidefont=14,
+            ylabel="Number of municipalities/counties<br>$blank",
+            tickfont=14*scale, guidefont=14*scale, left_margin=30px,
+            size=scale.*(800,550), legend=false)  # title=variable
         comparisonline && plot!(100*area_mult*[1, 1], collect(ylims(p)), line=(3, :dash))
         display(p)
-    elseif scatterplot == 1
-        p = scatter(df[!,variable]*area_mult, df[!,:capac], 
+        return df
+    end
+    # Filter out NaNs so scatter plots don't get messed up.
+    # https://github.com/JuliaPlots/Plots.jl/issues/3258
+    df = df[.!(isnan.(df[!,:capac]) .| isnan.(df[!,:class]) .| isnan.(df[!,variable])), :]
+    if scatterplot == 1
+        p = scatter(df[!,variable], df[!,:capac], 
             xlabel="Exploited area per municipality/county [%]",
             ylabel="MW",
-            size=(800,550), legend=false, colorbar=true,
-            markersize=df[!,:class].^(1+markersize/10),
+            size=scale.*(800,550), legend=false, colorbar=true,
+            markersize=scale*df[!,:class].^(1+markersize/10),
             marker_z=df[!,:masked], color=:watermelon, alpha=alpha,
             hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
             "<br>exploited = ".*string.(round.(df[!,variable]*area_mult,digits=1)).*"%".*
             "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
         display(p)
     elseif scatterplot == 2
-        p = scatter(df[!,variable]*area_mult, df[!,:class], 
-            xlabel="Exploited area per municipality/county [%]",
+        p = scatter(df[!,variable], df[!,:class], 
+            xlabel="Exploited area per municipality/county [%]", xlims=(-0.5,25.5),
             ylabel="Mean wind class",
-            size=(800,550), legend=false, colorbar=true,
-            markersize=max.(1, df[!,:capac].^(markersize/2)),
-            markerstrokewidth=0,
-            marker_z=df[!,:masked], color=:watermelon, alpha=alpha,
+            size=scale.*(800,550), legend=false, colorbar=true,
+            markersize=scale*df[!,:capac].^(markersize/7),
+            markerstrokecolor=RGBA(0,0,0,.2), markerstrokewidth=1,
+            tickfont=14*scale, guidefont=14*scale, left_margin=30px,
+            marker_z=df[!,:masked], color=:plasma, alpha=alpha,
             hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
-            "<br>test = ".*string.(max.(1, df[!,:capac].^(markersize/2))).*
             "<br>exploited = ".*string.(round.(df[!,variable]*area_mult,digits=1)).*"%".*
             "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
         display(p)
-    end       
+    elseif scatterplot == 3
+        p = scatter(df[!,variable], df[!,:class], 
+            xlabel="Exploited area per municipality/county [%]", xlims=(-0.5,25.5),
+            ylabel="Mean wind class",
+            size=scale.*(800,550), legend=false, colorbar=true,
+            markersize=markersize*scale,
+            markerstrokecolor=RGBA(0,0,0,.2), markerstrokewidth=0,
+            tickfont=14*scale, guidefont=14*scale, left_margin=30px,
+            color=RGB(0,0,0), alpha=alpha,
+            hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
+            "<br>exploited = ".*string.(round.(df[!,variable]*area_mult,digits=1)).*"%".*
+            "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
+        display(p)
+    end 
     return df
 end
 
