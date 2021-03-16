@@ -4,7 +4,7 @@ using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML, Plots, MAT,
         Loess, SmoothingSplines, Plots.PlotMeasures
 
 export openmap, readusa, readdk, readuk, readse, readde, readturbinedata, shapefile2csv,
-    scatterplots_model, plotdist, fill_missing_rotordiams!
+    scatterplots_model, plotdist, fill_missing_rotordiams!, closestturbine, turbines2parks
 
 function openmap(df::DataFrame, turbinenumber::Int)
     openmap(df, turbinenumber, :bing)
@@ -416,6 +416,36 @@ function plotdist(df::DataFrame; mincapac=0, area_mult=1.0, scatterplot=0, bins=
         display(p)
     end 
     return df
+end
+
+function minimumpositive(arr::AbstractArray)
+    min = typemax(eltype(arr))
+    index = 0
+    for (i, elem) in enumerate(arr)
+        if elem > 0 && elem < min
+            min = elem
+            index = i
+        end
+    end
+    return index, min
+end
+
+function closestturbine(region_abbrev)
+    df = DataFrame!(CSV.File(in_datafolder("turbines_$region_abbrev.csv")))
+    len = size(df, 1)
+    m_per_degree = pi*6371*2/360*1000
+    closest_dist = zeros(len)
+    rotordiams = zeros(Int, len)
+    for i = 1:len
+        row = df[i, :]
+        _, min = minimumpositive((df[:lat] .- row[:lat]).^2 + (df[:lon] .- row[:lon]).^2)
+        closest_dist[i] = m_per_degree * sqrt(min)
+        rotordiams[i] = row[:rotordiam]
+    end
+    # display(histogram(closest_dist[closest_dist .< 3000], bins=100))
+    rotordist = closest_dist./rotordiams
+    display(histogram(rotordist[rotordist .< 25], bins=1000))
+    df, closest_dist, rotordiams
 end
 
 end # module
