@@ -348,29 +348,36 @@ function scatterplots_model(gisregion, type=[:total]; showlines=false)
 
 function plotdist(gisregion::String; args...)
     df = DataFrame!(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
-    plotdist(df; args...)
+    plotdist(df; title=gisregion, args...)
 end
 
 function plotdist(gisregions::Vector{String}; args...)
     dfs = [DataFrame!(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
             for gisregion in gisregions]
+    for (i, gisregion) in enumerate(gisregions)
+        dfs[i][:,:gisregion] .= i
+    end
     df = vcat(dfs...)
-    plotdist(df; args...)
+    plotdist(df; title=join(gisregions, ", "), args...)
 end
 
 function plotdist(df::DataFrame; mincapac=0, area_mult=1.0, scatterplot=0, bins=100,
-                    variable=:exploit_tot, alpha=1, markersize=2, comparisonline=true,
-                    scale=1)
+                    variable=:exploit_tot, alpha=1, markersize=2, line=:mean,
+                    scale=1, xmax=30, title="", legend=true)
     df = df[df[!,:capac].>=mincapac, :]
     plotly()
     blank = "<span style='color:white; font-size: 1px;'>q</span>"
+    title = replace(title, "GADM" => "")
+    title = replace(title, r"\d" => "")
     if scatterplot == 0
-        p = histogram(df[!,variable], bins=range(0, 25.5, length=bins),
+        p = histogram(df[!,variable], bins=range(0, xmax+0.5, length=bins),
+            xlims=(0,Inf), ylims=(0,Inf), title=title,
             xlabel="Exploited area per municipality/county [%]",
             ylabel="Number of municipalities/counties<br>$blank",
             tickfont=14*scale, guidefont=14*scale, left_margin=30px,
             size=scale.*(800,550), legend=false)  # title=variable
-        comparisonline && plot!(100*area_mult*[1, 1], collect(ylims(p)), line=(3, :dash))
+        line_x = line == :mean ? mean(df[!,variable]) : 100*area_mult
+        line != :none && plot!(line_x*[1, 1], collect(ylims(p)), line=(3, :dash))
         display(p)
         return df
     end
@@ -380,17 +387,17 @@ function plotdist(df::DataFrame; mincapac=0, area_mult=1.0, scatterplot=0, bins=
     if scatterplot == 1
         p = scatter(df[!,variable], df[!,:capac], 
             xlabel="Exploited area per municipality/county [%]",
-            ylabel="MW",
+            ylabel="MW", title=title,
             size=scale.*(800,550), legend=false, colorbar=true,
             markersize=scale*df[!,:class].^(1+markersize/10),
             marker_z=df[!,:masked], color=:watermelon, alpha=alpha,
             hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
-            "<br>exploited = ".*string.(round.(df[!,variable]*area_mult,digits=1)).*"%".*
+            "<br>exploited = ".*string.(round.(df[!,variable],digits=1)).*"%".*
             "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
         display(p)
     elseif scatterplot == 2
         p = scatter(df[!,variable], df[!,:class], 
-            xlabel="Exploited area per municipality/county [%]", xlims=(-0.5,25.5),
+            xlabel="Exploited area per municipality/county [%]", xlims=(0, xmax+0.5),
             ylabel="Mean wind class",
             size=scale.*(800,550), legend=false, colorbar=true,
             markersize=scale*df[!,:capac].^(markersize/7),
@@ -398,21 +405,72 @@ function plotdist(df::DataFrame; mincapac=0, area_mult=1.0, scatterplot=0, bins=
             tickfont=14*scale, guidefont=14*scale, left_margin=30px,
             marker_z=df[!,:masked], color=:plasma, alpha=alpha,
             hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
-            "<br>exploited = ".*string.(round.(df[!,variable]*area_mult,digits=1)).*"%".*
+            "<br>exploited = ".*string.(round.(df[!,variable],digits=1)).*"%".*
             "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
         display(p)
     elseif scatterplot == 3
         p = scatter(df[!,variable], df[!,:class], 
-            xlabel="Exploited area per municipality/county [%]", xlims=(-0.5,25.5),
-            ylabel="Mean wind class",
+            xlabel="Exploited area per municipality/county [%]", xlims=(0, xmax+0.5),
+            ylabel="Mean wind class", title=title,
             size=scale.*(800,550), legend=false, colorbar=true,
             markersize=markersize*scale,
             markerstrokecolor=RGBA(0,0,0,.2), markerstrokewidth=0,
             tickfont=14*scale, guidefont=14*scale, left_margin=30px,
             color=RGB(0,0,0), alpha=alpha,
             hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
-            "<br>exploited = ".*string.(round.(df[!,variable]*area_mult,digits=1)).*"%".*
+            "<br>exploited = ".*string.(round.(df[!,variable],digits=1)).*"%".*
             "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
+        display(p)
+    elseif scatterplot == 4
+        cc = [RGB(0,0,1), RGB(0,0,0), RGB(0,1,0), RGB(1,0,0)]
+        p = scatter(df[!,variable], df[!,:windspeed], 
+            xlabel="Exploited area per municipality/county [%]",
+            ylabel="Mean wind speed [m/s]", xlims=(0, xmax+0.5), ylims=(3.5, 11), title=title,
+            size=scale.*(950,550), label="", colorbar=true,
+            markersize=markersize*scale,
+            markerstrokecolor=RGBA(0,0,0,.2), markerstrokewidth=0,
+            tickfont=14*scale, guidefont=14*scale, left_margin=30px,
+            color=cc[df[!,:gisregion]], alpha=alpha,
+            hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
+            "<br>exploited = ".*string.(round.(df[!,variable],digits=1)).*"%".*
+            "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
+        qq = [-1 -1 -1 -1]
+        scatter!(qq,qq,color=cc[[1 2 3 4]],alpha=alpha+0.1,legend=:outertopright,
+            markerstrokewidth=0, legendfont=12*scale, label=permutedims(split(title, ", ")))    
+        display(p)
+    elseif scatterplot == 5
+        cc = [RGB(0,0,1), RGB(0,0,0), RGB(0,1,0), RGB(1,0,0)]
+        p = scatter(df[!,variable], df[!,:windspeed], 
+            xlabel="Exploited area per municipality/county [%]",
+            ylabel="Mean wind speed [m/s]", xlims=(0, xmax+0.5), ylims=(3.5, 11), title=title,
+            size=scale.*(800+150*legend,550), label="", colorbar=false,
+            markersize=scale*df[!,:capac].^(markersize/7),
+            markerstrokecolor=RGBA(0,0,0,.2), markerstrokewidth=0,
+            tickfont=14*scale, guidefont=14*scale, left_margin=30px,
+            color=cc[df[!,:gisregion]], alpha=alpha,
+            hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
+            "<br>exploited = ".*string.(round.(df[!,variable],digits=1)).*"%".*
+            "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
+        qq = [-1 -1 -1 -1]
+        legend && scatter!(qq,qq,color=cc[[1 2 3 4]],alpha=alpha+0.1,legend=:outertopright,
+            markerstrokewidth=0, legendfont=12*scale, label=permutedims(split(title, ", ")))
+        display(p)
+    elseif scatterplot == 6
+        cc = [RGB(0,0,1), RGB(0,0,0), RGB(0,1,0), RGB(1,0,0)]
+        p = scatter(df[!,variable], max.(-1, log10.(df[!,:popdens])), 
+            xlabel="Exploited area per municipality/county [%]",
+            ylabel="Population density [log10 persons/km2]", xlims=(0, xmax+0.5), ylims=(-1.1, Inf), title=title,
+            size=scale.*(950,550), label="", colorbar=false,
+            markersize=scale*df[!,:capac].^(markersize/7),
+            markerstrokecolor=RGBA(0,0,0,.2), markerstrokewidth=0,
+            tickfont=14*scale, guidefont=14*scale, left_margin=30px,
+            color=cc[df[!,:gisregion]], alpha=alpha,
+            hover=df[!,:region].*"<br>".*string.(df[!,:capac]).*" MW".*
+            "<br>exploited = ".*string.(round.(df[!,variable],digits=1)).*"%".*
+            "<br>class = ".*string.(df[!,:class]).*"<br>masked = ".*string.(df[!,:masked]))
+        qq = [-1 -1 -1 -1]
+        scatter!(qq,qq,color=cc[[1 2 3 4]],alpha=alpha+0.1,legend=:outertopright,
+            markerstrokewidth=0, legendfont=12*scale, label=permutedims(split(title, ", ")))
         display(p)
     end 
     return df
