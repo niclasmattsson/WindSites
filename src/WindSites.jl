@@ -43,7 +43,7 @@ function readusa()
     # US Wind Turbine Database
     # https://eerscmap.usgs.gov/uswtdb/
     datadir = joinpath(@__DIR__, "..", "data")
-    df = DataFrame!(CSV.File("$datadir/USA_uswtdb_v3_1_20200717.csv"))
+    df = DataFrame(CSV.File("$datadir/USA_uswtdb_v3_1_20200717.csv"))
     select!(df, [:t_cap, :xlong, :ylat, :p_year, :t_model, :t_hh, :t_rd])
     rename!(df, [:capac, :lon, :lat, :year, :model, :hubheight, :rotordiam])
     delete!(df, ismissing.(df[:, :capac]))
@@ -60,7 +60,7 @@ function readuk()
     # https://www.gov.uk/government/publications/renewable-energy-planning-database-monthly-extract
     datadir = joinpath(@__DIR__, "..", "data")
     cols = [6,9,14,15,16,19,25,26,47]
-    df = DataFrame!(CSV.File("$datadir/UK_REPD-June-2020-update.csv"))[:, cols]
+    df = DataFrame(CSV.File("$datadir/UK_REPD-June-2020-update.csv"))[:, cols]
     rename!(df, [:type, :capac_park, :capac, :nturbines, :height, :status, :lon, :lat, :year])
     delete!(df, .!startswith.(df[!, :type], "Wind"))
     delete!(df, df[:, :status] .!= "Operational")
@@ -93,7 +93,7 @@ function readdk()
     # https://ens.dk/service/statistik-data-noegletal-og-kort/data-oversigt-over-energisektoren
     datadir = joinpath(@__DIR__, "..", "data")
     cols = [3,13,14,2,7,5,4,10,58]
-    df = DataFrame!(XLSX.readtable("$datadir/DK_anlaegprodtilnettet_0.xlsx", "IkkeAfmeldte-Existing turbines",
+    df = DataFrame(XLSX.readtable("$datadir/DK_anlaegprodtilnettet_0.xlsx", "IkkeAfmeldte-Existing turbines",
         "A:BM", first_row=19, header=false, infer_eltypes=false)...)[!, cols]
     rename!(df, [:capac, :lon, :lat, :year, :model, :hubheight, :rotordiam, :onshore, :elec2018])
     df[!, :capac] = convert.(Int, round.(df[!, :capac]))
@@ -121,7 +121,7 @@ end
 
 function xlsx2csv()
     datadir = joinpath(@__DIR__, "..", "data")
-    df = DataFrame!(XLSX.readtable("$datadir/SE_Vindbrukskollen_export_allman_Prod.xlsx", "Vindkraftverk",
+    df = DataFrame(XLSX.readtable("$datadir/SE_Vindbrukskollen_export_allman_Prod.xlsx", "Vindkraftverk",
         "A:AN", first_row=1, header=true, infer_eltypes=true)...)
     CSV.write("$datadir/SE_Vindbrukskollen_export_allman_Prod.csv", df)
     return df
@@ -195,7 +195,7 @@ function readde()
 
     # shapefile2csv("renewable_energy_plants_germany_until_2015/windpower.shp")
     datadir = joinpath(@__DIR__, "..", "data")
-    df = DataFrame!(CSV.File("$datadir/DE_windpower.csv"))[!, 2:7]
+    df = DataFrame(CSV.File("$datadir/DE_windpower.csv"))[!, 2:7]
     rename!(df, [:year, :capac, :hubheight, :rotordiam, :lon, :lat])
 
     x = df[!, :lon] # European Terrestrial Reference System 1989: ETRS89/LAEA Europe = EPSG:3035
@@ -291,8 +291,8 @@ function fill_missing_rotordiams!(df_dk, df_usa, df_uk, df_se, df_de; rotordiamp
 end
 
 function scatterplots_model(gisregion, type=[:total]; showlines=false)
-    dfg = DataFrame!(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
-    dfm = DataFrame!(CSV.File(in_datafolder("output", "windresults_$gisregion.csv")))
+    dfg = DataFrame(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
+    dfm = DataFrame(CSV.File(in_datafolder("output", "windresults_$gisregion.csv")))
     dfm[!,:mcap] = vec(sum(Array(dfm[:, [:cap1, :cap2, :cap3, :cap4, :cap5]]), dims=2))
     dfm[!,:moffcap] = vec(sum(Array(dfm[:, [:offcap1, :offcap2, :offcap3, :offcap4, :offcap5]]), dims=2))
     dfm[!,:melec] = vec(sum(Array(dfm[:, [:elec1, :elec2, :elec3, :elec4, :elec5]]), dims=2))
@@ -347,12 +347,12 @@ function scatterplots_model(gisregion, type=[:total]; showlines=false)
  end
 
 function plotdist(gisregion::String; args...)
-    df = DataFrame!(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
+    df = DataFrame(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
     plotdist(df; title=gisregion, args...)
 end
 
 function plotdist(gisregions::Vector{String}; args...)
-    dfs = [DataFrame!(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
+    dfs = [DataFrame(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
             for gisregion in gisregions]
     for (i, gisregion) in enumerate(gisregions)
         dfs[i][:,:gisregion] .= i
@@ -489,7 +489,7 @@ function minimumpositive(arr::AbstractArray)
 end
 
 function closestturbine(region_abbrev)
-    df = DataFrame!(CSV.File(in_datafolder("turbines_$region_abbrev.csv")))
+    df = DataFrame(CSV.File(in_datafolder("turbines_$region_abbrev.csv")))
     len = size(df, 1)
     m_per_degree = pi*6371*2/360*1000
     closest_dist = zeros(len)
