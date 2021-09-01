@@ -1,11 +1,14 @@
 module WindSites
 
 using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML, Plots, MAT,
-        Loess, SmoothingSplines, Plots.PlotMeasures
+        Loess, SmoothingSplines, Plots.PlotMeasures, CategoricalArrays
 
 export openmap, readusa, readdk, readuk, readse, readde, readturbinedata, shapefile2csv,
-    scatterplots_model, plotdist, fill_missing_rotordiams!, closestturbine, turbines2parks
+    scatterplots_model, plotdist, fill_missing_rotordiams!, closestturbine, turbines2parks,
+    analyze_protected, analyze_natura2000, analyze_landtype, grouppopulationdensity, groupwindspeeds
+
 include("regional_level_GIS.jl")
+include("turbine_level_GIS.jl")
 
 function openmap(df::DataFrame, turbinenumber::Int)
     openmap(df, turbinenumber, :bing)
