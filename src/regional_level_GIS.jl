@@ -1,10 +1,11 @@
-function plotdist(gisregion::String; args...)
-    df = DataFrame(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
+function plotdist(gisregion::String, minturbine=1000, maxpopdens=150; args...)
+    filename = "regionalwindGIS_$(gisregion)_minturbine=$(minturbine)_maxpopdens=$(maxpopdens).csv"
+    df = DataFrame(CSV.File(in_datafolder("output", filename)))
     plotdist(df; title=gisregion, args...)
 end
 
-function plotdist(gisregions::Vector{String}; args...)
-    dfs = [DataFrame(CSV.File(in_datafolder("output", "regionalwindGIS_$gisregion.csv")))
+function plotdist(gisregions::Vector{String}, minturbine=1000, maxpopdens=150; args...)
+    dfs = [DataFrame(CSV.File(in_datafolder("output", "regionalwindGIS_$(gisregion)_minturbine=$(minturbine)_maxpopdens=$(maxpopdens).csv")))
             for gisregion in gisregions]
     for (i, gisregion) in enumerate(gisregions)
         dfs[i][:,:gisregion] .= i
