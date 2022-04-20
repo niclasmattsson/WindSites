@@ -1,24 +1,32 @@
 module WindSites
 
-using Proj4, XLSX, CSV, DataFrames, Dates, GDAL_jll, Pkg.TOML, Plots, MAT,
-        Loess, SmoothingSplines, Plots.PlotMeasures, CategoricalArrays
+using Proj4, XLSX, CSV, DataFrames, Dates, Pkg.TOML, Plots, MAT,
+        Loess, SmoothingSplines, Plots.PlotMeasures, CategoricalArrays, PrettyTables
 
 export openmap, readusa, readdk, readuk, readse, readde, readturbinedata, shapefile2csv,
     scatterplots_model, plotdist, fill_missing_rotordiams!, closestturbine, turbines2parks,
-    analyze_protected, analyze_natura2000, analyze_landtype, grouppopulationdensity, groupwindspeeds
+    analyze_protected, analyze_natura2000, analyze_landtype, grouppopulationdensity, groupwindspeeds,
+    readfarms, savefarms, read_irena, stats
 
 include("regional_level_GIS.jl")
 include("turbine_level_GIS.jl")
 
 function openmap(df::DataFrame, turbinenumber::Int)
-    openmap(df, turbinenumber, :bing)
     openmap(df, turbinenumber, :google)
+    openmap(df, turbinenumber, :bing)
 end
     
 function openmap(df::DataFrame, turbinenumber::Int, source::Symbol)
     lon, lat = df[turbinenumber, :lon], df[turbinenumber, :lat]
     if source == :google
-        url = "http://maps.google.com/maps?t=k\"&\"q=loc:$lat+$lon"
+        # url = "https://www.google.com/maps/@?api=1\"&\"map_action=map\"&\"basemap=satellite\"&\"center=$lat%2C$lon\"&\"zoom=18"   # satellite map but no pin
+        url = "https://www.google.com/maps/search/?api=1\"&\"query=$lat%2C$lon\"&\"basemap=satellite\"&\"zoom=18"   # map with pin but not satellite
+        # url = "http://maps.google.com/maps?t=k\"&\"q=loc:$lat+$lon"   # used to do both but no longer places pin
+        # https://stackoverflow.com/questions/47038116/google-maps-url-with-pushpin-and-satellite-basemap
+        # https://stackoverflow.com/questions/60219254/show-location-marker-in-new-browser-window
+        c = Cmd(`cmd /c start \"\" $url`, windows_verbatim=true)
+        run(c)
+        url = "https://www.google.com/maps/@?api=1\"&\"map_action=map\"&\"basemap=satellite\"&\"center=$lat%2C$lon\"&\"zoom=18" 
     else
         url = "https://bing.com/maps/default.aspx?cp=$lat~$lon\"&\"lvl=18\"&\"style=a\"&\"sp=point.$(lat)_$(lon)_"
     end
@@ -41,6 +49,110 @@ function openmapchrome(lon::Real, lat::Real)
     url = "http://maps.google.com/maps?t=k&q=loc:$lat+$lon"
     println("Opening $url...")
     run(`$command $url`)
+end
+
+function readall()
+    cols = [:lon, :lat, :capac, :year, :onshore, :elec2018]
+    df_DK = DataFrame(CSV.File(in_datafolder("turbines_DK.csv")))[:, cols]
+    df_SE = DataFrame(CSV.File(in_datafolder("turbines_SE.csv")))[:, cols[1:5]]
+    df_DE = DataFrame(CSV.File(in_datafolder("turbines_DE.csv")))[:, cols[1:4]]
+    df_USA = DataFrame(CSV.File(in_datafolder("turbines_USA.csv")))[:, cols[1:4]]
+    df_SE[:, :elec2018] .= missing    # MWh/year
+    df_DE[:, :elec2018] .= missing    # MWh/year
+    df_DE[:, :onshore] .= missing    # MWh/year
+    df_USA[:, :elec2018] .= missing    # MWh/year
+    df_USA[:, :onshore] .= missing    # MWh/year
+    df_SE[!,:year] = [ismissing(d) ? 2000 : year(d) for d in df_SE[!,:year]]
+    df_DK.country .= "Denmark"
+    df_SE.country .= "Sweden"
+    df_DE.country .= "Germany"
+    df_USA.country .= "USA"
+    return vcat(df_DK, df_SE, df_DE, df_USA)
+end
+
+function readfarms(winddir = "C:/Users/niclas/Downloads/wind data")
+    df = DataFrame(CSV.File("$winddir/Windfarms_World_20220407_fixed.csv"; quotechar='\'', missingstring=["#ND", ""]))
+    # ["ID (#ND = no data)", "Continent", "ISO code (Code ISO 3166.1)", "Country", "State code", "Area", "City", "Name", "2nd name",
+    #     "Latitude (WGS84)", "Longitude (WGS84)", "Altitude/Depth (m)", "Location accuracy (Yes = accurate location)", "Offshore - Shore distance (km)",
+    #     "Manufacturer", "Turbine", "Hub height (m)", "Number of turbines", "Total power (kW)", "Developer", "Operator", "Owner",
+    #     "Commissioning date (Format: yyyy or yyyymm)", "Status", "Decommissioning date (Format: yyyy or yyyymm)", "Link", "Update"]
+    newnames = [:id, :continent, :iso, :country, :state, :area, :city, :name, :name2, :lat, :lon, :altitude, :accurate_location, :offshore,
+        :manufacturer, :turbine, :hubheight, :num_turbines, :capac, :developer, :operator, :owner, :startdate, :status, :enddate, :link, :updated]
+    rename!(df, newnames)
+    df[!, [:lat, :lon]] = [ismissing(x) ? missing : parse(Float64, replace(x, "," => ".")) for x in Array(df[!, [:lat, :lon]])]
+    df.year = [ismissing(x) ? missing : parse(Int, x[1:4]) for x in df.startdate]
+    df.endyear = [ismissing(x) ? missing : parse(Int, x[1:4]) for x in df.enddate]
+    df.month = [ismissing(x) ? missing : (m = match(r".*/(\d+)", x)) === nothing ? missing : parse(Int, m[1]) for x in df.startdate]
+    df.endmonth = [ismissing(x) ? missing : (m = match(r".*/(\d+)", x)) === nothing ? missing : parse(Int, m[1]) for x in df.enddate]
+    df.accurate_location = [x == "Yes" ? true : x == "No" ? false : missing for x in df.accurate_location]
+    df.onshore = [x == "No" ? true : x == "Yes" ? false : missing for x in df.offshore]
+    df.altitude = [ismissing(x) ? missing : (m = match(r"(\d+)/(\d+)", x)) === nothing ? round(Int, parse(Float64, x)) :
+                            round(Int, mean(parse.(Int, [m[1], m[2]]))) for x in df.altitude]
+    replacecountries = ["United-Kingdom" => "United Kingdom", "New-Zealand" => "New Zealand"]
+    replace!(df.country, replacecountries...)
+    filter!(row -> row.status == "Production", df)
+    select!(df, [newnames[2:13]; :onshore; newnames[15:22]; :year; :month; :status; :endyear; :endmonth])
+    return df
+end
+
+function savefarms(winddir = "C:/Users/niclas/Downloads/wind data")
+    wf = readfarms(winddir)
+    CSV.write("$winddir/windfarms.csv", wf)
+end
+
+function read_irena(winddir = "C:/Users/niclas/Downloads/wind data")
+    df = DataFrame(CSV.File("$winddir/IRENA ELECCAP_20220411-085642.csv", header=3, missingstring=".."))
+    # "Country/area", "Technology", "Grid connection", "Year", "Installed electricity capacity by country/area (MW)"
+    newnames = [:country, :onshore, :gridconnected, :year, :capac]
+    rename!(df, newnames)
+    df.onshore = (df.onshore .== "Onshore wind energy")
+    df.gridconnected = (df.gridconnected .== "On-grid")
+    replacecountries = ["United Kingdom of Great Britain and Northern Ireland" => "United Kingdom", "United States of America" => "USA"]
+    replace!(df.country, replacecountries...)
+    # rows = df.gridconnected .&& df.year .== 2020
+    # onshore2020 = Dict(row.country => row.capac for row in eachrow(df[rows .&& df.onshore, :]) if !ismissing(row.capac))
+    # offshore2020 = Dict(row.country => row.capac for row in eachrow(df[rows .&& .!df.onshore, :]) if !ismissing(row.capac))
+    return df
+end
+
+function stats(onoff)
+    countries = ["Denmark", "Sweden", "Ireland", "Germany", "Norway", "Spain", "Portugal", "Finland", "Uruguay", "Belgium", "Greece",
+                    "Netherlands", "United Kingdom", "Australia", "Austria", "USA", "Canada", "Luxembourg", "France", "Estonia"]
+    wf = readfarms()
+    dff = readall()
+    dfi = read_irena()
+    headings = ["country", "WF_2020", "IRENA_2020", "WF_share", "FRT_2020", "FRT_share", "WF_has_year", "WF_has_location", "WF_accurate_location"]
+    data = reshape([], 0, length(headings))
+    for country in countries
+        onshore = onoff == "onshore" ? dfi.onshore : onoff == "offshore" ? .!dfi.onshore : ones(Bool, size(dfi, 1)) 
+        capac_irena = sum(skipmissing(dfi[dfi.country .== country .&& onshore .&& dfi.gridconnected .&& dfi.year .== 2020, :capac])) / 1000 |> x -> round(x, digits=2)
+        if country in ["Denmark", "Sweden", "Germany", "USA"]
+            onshore = onoff == "onshore" ? dff.onshore : onoff == "offshore" ? .!dff.onshore : ones(Bool, size(dff, 1)) 
+            capac_frt = sum(dff[dff.country .== country .&& .!ismissing.(onshore) .&& onshore .&& .!ismissing.(dff.year) .&& dff.year .<= 2020, :capac]) / 1e6 |> x -> round(x, digits=2)
+            frt_share = round(100*capac_frt/capac_irena, digits=1)
+        else
+            capac_frt, frt_share = ".", "."
+        end
+        onshore = onoff == "onshore" ? wf.onshore : onoff == "offshore" ? .!wf.onshore : ones(Bool, size(wf, 1)) 
+        df = wf[wf.country .== country .&& .!ismissing.(onshore) .&& onshore .&& .!ismissing.(wf.capac), :]
+        capac_wf = sum(df[.!ismissing.(df.year) .&& df.year .<= 2020, :capac]) / 1e6 |> x -> round(x, digits=2)
+        wf_share = round(100*capac_wf/capac_irena, digits=1)
+        capac_has_year = sum(df[.!ismissing.(df.year), :capac])
+        capac_has_location = sum(df[.!ismissing.(df.lat), :capac])
+        capac_accurate_location = sum(df[df.accurate_location, :capac])
+        capac_tot = sum(df[:, :capac])
+        has_year = round(100*capac_has_year/capac_tot, digits=1)
+        has_location = round(100*capac_has_location/capac_tot, digits=1)
+        accurate_location = round(100*capac_accurate_location/capac_tot, digits=1)
+        if capac_irena == 0
+            wf_share = "."
+        end
+        if capac_tot == 0
+            has_year, has_location, accurate_location = ".", ".", "."
+        end
+        data = [data; country capac_wf capac_irena wf_share capac_frt frt_share has_year has_location accurate_location]
+    end
+    pretty_table(data, header=(headings, ["", "GW", "GW", "% (irena)", "GW", "% (irena)", "% (capac)", "% (capac)", "% (capac)"]))
 end
 
 function readusa()
@@ -73,9 +185,9 @@ function readuk()
     df[!, :nturbines] = parse.(Int, df[!, :nturbines])
     df[!, :height] = parse_not_missing.(Int, df[!, :height])
     df[!, :capac] = parse.(Float64, df[!, :capac])
-    df[!, :capac_park] = parse.(Float64, replace.(df[!, :capac_park], "," => ""))
-    df[!, :lon] = parse.(Int, replace.(df[!, :lon], "," => ""))
-    df[!, :lat] = parse.(Int, replace.(df[!, :lat], "," => ""))
+    df[!, :capac_park] = parse.(Float64, replace.(df[!, :capac_park], ", " => ""))
+    df[!, :lon] = parse.(Int, replace.(df[!, :lon], ", " => ""))
+    df[!, :lat] = parse.(Int, replace.(df[!, :lat], ", " => ""))
     df[!, :year] = Date.(df[!, :year], dateformat"d/m/y")
 
     x = df[!, :lon] # BNG: British National Grid = EPSG:27700
